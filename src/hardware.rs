@@ -4,9 +4,10 @@
 use std::fmt::{Debug, Display};
 
 use jni::{
-    Env, JavaVM,
+    Env, JavaVM, jni_sig,
     objects::{JClass, JObject, JString},
     refs::Global,
+    signature::{RuntimeFieldSignature, RuntimeMethodSignature},
     strings::JNIString,
 };
 
@@ -55,10 +56,12 @@ impl Hardware {
                     env.call_method(
                         &self.hardware_map,
                         JNIString::new("get"),
-                        JNIString::new(format!(
+                        RuntimeMethodSignature::from_str(format!(
                             "(Ljava/lang/Class;Ljava/lang/String;)L{};",
                             T::JNI_CLASS
-                        )),
+                        ))
+                        .unwrap()
+                        .method_signature(),
                         &[(&class).into(), (&name).into()],
                     )
                     .unwrap()
@@ -123,7 +126,7 @@ macro_rules! enum_variant_into {
                         JNIString::new(match self {
                             $(Self:: $variant => stringify!($variant).to_uppercase()),*
                         }),
-                        JNIString::new(Self::[< $($prefix)? JNI_CLASS >]),
+                        RuntimeFieldSignature::from_str(concat!("L", $jni_class, ";")).unwrap().field_signature(),
                     )
                     .unwrap()
                     .l()
@@ -209,7 +212,9 @@ impl Direction {
                 Self::Forward => "Forward".to_uppercase(),
                 Self::Reverse => "Reverse".to_uppercase(),
             }),
-            JNIString::new(Self::SERVO_JNI_CLASS),
+            RuntimeFieldSignature::from_str(Self::SERVO_JNI_CLASS)
+                .unwrap()
+                .field_signature(),
         )
         .unwrap()
         .l()
@@ -225,7 +230,7 @@ impl Direction {
                     env.call_method(
                         &obj,
                         crate::jni::strings::JNIString::new("ordinal"),
-                        crate::jni::strings::JNIString::new("()I"),
+                        jni_sig!("()I"),
                         &[],
                     )
                 }
@@ -439,11 +444,13 @@ impl IntoJniObject for AngularVelocity {
 
         env.new_object(
             class,
-            JNIString::new(format!(
+            RuntimeMethodSignature::from_str(format!(
                 "(L{};FFFJ)L{};",
                 AngleUnit::JNI_CLASS,
                 Self::JNI_CLASS
-            )),
+            ))
+            .unwrap()
+            .method_signature(),
             &[
                 (&angle).into(),
                 self.x_speed.into(),
@@ -457,23 +464,23 @@ impl IntoJniObject for AngularVelocity {
     fn from_jni_object(vm: &JavaVM, obj: Global<JObject<'static>>) -> Self {
         vm.attach_current_thread(|env| {
             let x_speed = env
-                .get_field(&obj, JNIString::new("xRotationRate"), JNIString::new("F"))
+                .get_field(&obj, JNIString::new("xRotationRate"), jni_sig!("F"))
                 .unwrap()
                 .f()
                 .unwrap();
             let y_speed = env
-                .get_field(&obj, JNIString::new("yRotationRate"), JNIString::new("F"))
+                .get_field(&obj, JNIString::new("yRotationRate"), jni_sig!("F"))
                 .unwrap()
                 .f()
                 .unwrap();
             let z_speed = env
-                .get_field(&obj, JNIString::new("zRotationRate"), JNIString::new("F"))
+                .get_field(&obj, JNIString::new("zRotationRate"), jni_sig!("F"))
                 .unwrap()
                 .f()
                 .unwrap();
 
             let acquisition_time = env
-                .get_field(&obj, JNIString::new("acquisitionTime"), JNIString::new("J"))
+                .get_field(&obj, JNIString::new("acquisitionTime"), jni_sig!("J"))
                 .unwrap()
                 .j()
                 .unwrap();
@@ -482,7 +489,12 @@ impl IntoJniObject for AngularVelocity {
                 .get_field(
                     &obj,
                     JNIString::new("angleUnit"),
-                    JNIString::new(format!("L{};", AngleUnit::UNNORMALIZED_JNI_CLASS)),
+                    RuntimeFieldSignature::from_str(format!(
+                        "L{};",
+                        AngleUnit::UNNORMALIZED_JNI_CLASS
+                    ))
+                    .unwrap()
+                    .field_signature(),
                 )
                 .unwrap()
                 .l()
@@ -620,11 +632,13 @@ impl IntoJniObject for YawPitchRollAngles {
 
         env.new_object(
             class,
-            JNIString::new(format!(
+            RuntimeMethodSignature::from_str(format!(
                 "(L{};DDDJ)L{};",
                 AngleUnit::JNI_CLASS,
                 Self::JNI_CLASS
-            )),
+            ))
+            .unwrap()
+            .method_signature(),
             &[
                 (&angle).into(),
                 self.yaw.into(),
@@ -776,12 +790,14 @@ impl IntoJniObject for Rev9AxisImuOrientationOnRobot {
 
         env.new_object(
             class,
-            JNIString::new(format!(
+            RuntimeMethodSignature::from_str(format!(
                 "(L{};L{};)L{};",
                 Orientation::LOGO_JNI_CLASS,
                 Orientation::I2C_JNI_CLASS,
                 Self::JNI_CLASS
-            )),
+            ))
+            .unwrap()
+            .method_signature(),
             &[(&logo).into(), (&i2c).into()],
         )
         .unwrap()
@@ -819,6 +835,30 @@ pub enum Manufacturer {
     MaxBotix,
     LimelightVision,
     GoBilda,
+}
+
+impl Display for Manufacturer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Manufacturer::Unknown => "Unknown Vendor",
+            Manufacturer::Other => "Other Vendor",
+            Manufacturer::Lego => "LEGO",
+            Manufacturer::HiTechnic => "HiTechnic",
+            Manufacturer::ModernRobotics => "Modern Robotics",
+            Manufacturer::Adafruit => "Adafruit",
+            Manufacturer::Matrix => "Matrix",
+            Manufacturer::Lynx => "Lynx",
+            Manufacturer::AMS => "AMS",
+            Manufacturer::STMicroelectronics => "ST Microelectronics",
+            Manufacturer::Broadcom => "Broadcom",
+            Manufacturer::DFRobot => "DFRobot",
+            Manufacturer::DigitalChickenLabs => "Digital Chicken Labs",
+            Manufacturer::SparkFun => "SparkFun Electronics",
+            Manufacturer::MaxBotix => "MaxBotix",
+            Manufacturer::LimelightVision => "Limelight",
+            Manufacturer::GoBilda => "GoBilda",
+        })
+    }
 }
 
 enum_variant_into! {
@@ -909,7 +949,7 @@ impl HardwareDevice {
                 .l()
                 .unwrap();
                 jni::errors::Result::Ok(
-                    JString::cast_local(res, env)
+                    JString::cast_local(env, res)
                         .unwrap()
                         .mutf8_chars(env)
                         .unwrap()
@@ -936,7 +976,7 @@ impl HardwareDevice {
                 .l()
                 .unwrap();
                 jni::errors::Result::Ok(
-                    JString::cast_local(res, env)
+                    JString::cast_local(env, res)
                         .unwrap()
                         .mutf8_chars(env)
                         .unwrap()

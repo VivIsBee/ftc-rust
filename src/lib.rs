@@ -5,7 +5,7 @@ use std::fmt::{Debug, Display};
 #[cfg(feature = "proc-macro")]
 pub use ftc_rust_proc::ftc;
 pub use jni;
-use jni::{objects::JObject, refs::Global, strings::JNIString, vm::JavaVM};
+use jni::{jni_sig, objects::JObject, refs::Global, strings::JNIString, vm::JavaVM};
 
 use crate::{
     command::{Command, SCHEDULER},
@@ -291,7 +291,7 @@ macro_rules! gamepad_button {
                     env.get_field(
                         &self.gamepad,
                         JNIString::new(stringify!($name)),
-                        JNIString::new("Z"),
+                        jni_sig!("Z"),
                     )
                     .unwrap()
                     .z()
@@ -371,7 +371,7 @@ macro_rules! gamepad_button {
                         env.get_field(
                             &self.gamepad,
                             JNIString::new(stringify!($name)),
-                            JNIString::new("F"),
+                            jni_sig!("F"),
                         )
                         .unwrap()
                         .f()
@@ -564,7 +564,7 @@ impl FtcContext {
     pub fn new<'local>(env: &mut jni::Env<'local>, this: JObject<'local>) -> Self {
         Self {
             this: env.new_global_ref(this).unwrap(),
-            vm: env.get_java_vm(),
+            vm: env.get_java_vm().unwrap(),
         }
     }
     /// Return a telemetry struct.
@@ -577,7 +577,7 @@ impl FtcContext {
                     env.get_field(
                         &self.this,
                         JNIString::new("telemetry"),
-                        JNIString::new("Lorg/firstinspires/ftc/robotcore/external/Telemetry;"),
+                        jni_sig!("Lorg/firstinspires/ftc/robotcore/external/Telemetry;"),
                     )
                     .unwrap()
                     .l()
@@ -601,7 +601,7 @@ impl FtcContext {
                     env.get_field(
                         &self.this,
                         JNIString::new("hardwareMap"),
-                        JNIString::new("Lcom/qualcomm/robotcore/hardware/HardwareMap;"),
+                        jni_sig!("Lcom/qualcomm/robotcore/hardware/HardwareMap;"),
                     )
                     .unwrap()
                     .l()
@@ -625,7 +625,7 @@ impl FtcContext {
                     env.get_field(
                         &self.this,
                         JNIString::new("gamepad1"),
-                        JNIString::new("Lcom/qualcomm/robotcore/hardware/Gamepad;"),
+                        jni_sig!("Lcom/qualcomm/robotcore/hardware/Gamepad;"),
                     )
                     .unwrap()
                     .l()
@@ -650,7 +650,7 @@ impl FtcContext {
                     env.get_field(
                         &self.this,
                         JNIString::new("gamepad2"),
-                        JNIString::new("Lcom/qualcomm/robotcore/hardware/Gamepad;"),
+                        jni_sig!("Lcom/qualcomm/robotcore/hardware/Gamepad;"),
                     )
                     .unwrap()
                     .l()

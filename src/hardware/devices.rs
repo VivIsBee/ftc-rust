@@ -2,7 +2,7 @@
 
 use std::ops::RangeInclusive;
 
-use jni::{JavaVM, objects::JObject, refs::Global, strings::JNIString};
+use jni::{JavaVM, objects::JObject, refs::Global, signature::RuntimeMethodSignature};
 
 use crate::{
     call_method,
@@ -69,7 +69,7 @@ impl DcMotor {
             .unwrap();
     }
 
-    /// Returns the current logical direction in which this motor is set as operating.
+    /// Returns the current logical direction in which this motor is operating.
     #[doc(alias = "getDirection")]
     pub fn get_direction(&self) -> Direction {
         let res = call_method!(
@@ -85,13 +85,17 @@ impl DcMotor {
     /// Sets the power level of the motor, expressed as a fraction of the maximum possible power /
     /// speed supported according to the run mode in which the motor is operating.
     ///
-    /// Setting a power level of zero will brake the motor
+    /// See [`set_zero_power_behavior`](DcMotor::set_zero_power_behavior) for what happens when zero
+    /// power is applied.
+    ///
+    /// In debug builds, setting this outside the range of -1.0..=1.0 will panic.
     #[doc(alias = "setPower")]
     pub fn set_power(&self, power: f64) {
         debug_assert!(
             (-1.0..=1.0).contains(&power),
             "motor power/speed should be contained within -1.0..=1.0"
         );
+
         call_method!(void self, self.object, "setPower", "(D)V", [power]);
     }
 
@@ -106,6 +110,8 @@ impl DcMotor {
     /// Sets the behavior of the motor when a power level of zero is applied.
     #[doc(alias = "setZeroPowerBehavior")]
     pub fn set_zero_power_behavior(&self, zpb: ZeroPowerBehavior) {
+        debug_assert_ne!(zpb, ZeroPowerBehavior::Unknown);
+
         self.vm
             .attach_current_thread(|env| {
                 let obj = zpb.into_jni_object(env);
@@ -440,10 +446,12 @@ impl IMU {
                 let params = env
                     .new_object(
                         class,
-                        JNIString::new(format!(
+                        RuntimeMethodSignature::from_str(format!(
                             "(L{};)Lcom/qualcomm/robotcore/hardware/IMU$Parameters;",
                             Rev9AxisImuOrientationOnRobot::JNI_CLASS
-                        )),
+                        ))
+                        .unwrap()
+                        .method_signature(),
                         &[(&orientation).into()],
                     )
                     .unwrap();

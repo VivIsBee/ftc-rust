@@ -4,7 +4,7 @@ version = "11.0.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "Library for running Rust code on FTC robots."
-repository = "https://github.com/Aversefun/ftc-rust"
+repository = "https://github.com/VivIsBee/ftc-rust"
 keywords = ["robot", "robotics", "first-robotics"]
 categories = ["science::robotics"]
 
@@ -14,8 +14,7 @@ controller_version = "11.0"
 [dependencies]
 ftc-rust-proc = { path = "./ftc-rust-proc", optional = true }
 
-# Last version is from two years ago, last commit is from a month ago
-jni = { git = "https://github.com/jni-rs/jni-rs" }
+jni = "0.22.4"
 paste = "1.0.15"
 
 [features]
@@ -25,6 +24,7 @@ proc-macro = ["dep:ftc-rust-proc"]
 [lints.rust]
 missing_docs = "deny"
 missing_debug_implementations = "warn"
+unused_import_braces = "warn"
 
 [lints.clippy]
 missing_docs_in_private_items = "warn"

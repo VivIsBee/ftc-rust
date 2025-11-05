@@ -34,7 +34,7 @@ macro_rules! call_method {
             .call_method(
                 &obj,
                 $crate::jni::strings::JNIString::new($name),
-                $crate::jni::strings::JNIString::new($sig),
+                $crate::jni::signature::RuntimeMethodSignature::from_str($sig).unwrap().method_signature(),
                 &[],
             )
     }};
@@ -45,7 +45,7 @@ macro_rules! call_method {
             .call_method(
                 &obj,
                 $crate::jni::strings::JNIString::new($name),
-                $crate::jni::strings::JNIString::new($sig),
+                $crate::jni::signature::RuntimeMethodSignature::from_str($sig).unwrap().method_signature(),
                 &$args.into_iter().map(|v| v.into()).collect::<Vec<$crate::jni::JValue>>(),
             )
     }};
@@ -55,7 +55,7 @@ macro_rules! call_method {
 #[macro_export]
 macro_rules! new_string {
     (env $env:expr, $val:expr) => {
-        $env.new_string(JNIString::new($val))
+        $env.new_string($val)
     };
     (vm $vm:expr, $val:expr) => {
         $vm.attach_current_thread(|env| $crate::new_string!(env env, $val))

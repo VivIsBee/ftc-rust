@@ -1,2 +1,0 @@
-# A dependency of ftc-rust-proc pulls in another version of syn but doesn't publically require the types from it
-allowed-duplicate-crates = ["syn"]

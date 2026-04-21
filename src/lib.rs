@@ -242,10 +242,11 @@ pub struct StickCommand<F: FnMut(f32) + 'static + Send + Sync> {
     pub gamepad: WhichGamepad,
     /// The stick to check.
     pub stick: Stick,
-    /// The threshold it must meet to activate.
+    /// The threshold it must meet to activate. If negative, it must be less than this, if positive
+    /// it must be greater.
     pub threshold: f32,
-    /// Whether the direction matters. If not, the absolute value is taken of the stick first.
-    pub dir: bool,
+    /// If false, the absolute value is taken of the stick first.
+    pub abs: bool,
     /// The function to call when the condition is met.
     pub f: F,
 }
@@ -267,8 +268,8 @@ impl<F: FnMut(f32) + 'static + Send + Sync> Command for StickCommand<F> {
             WhichGamepad::Gamepad2 => ctx.gamepad2(),
         };
         let value = gamepad.get_stick(self.stick);
-        let value = if self.dir { value } else { value.abs() };
-        let threshold = if self.dir {
+        let value = if self.abs { value } else { value.abs() };
+        let threshold = if self.abs {
             self.threshold
         } else {
             self.threshold.abs()
@@ -413,6 +414,17 @@ impl Gamepad {
     pub fn reset_edge_detection(&self) {
         call_method!(void self, self.gamepad, "resetEdgeDetection", "()V", []);
     }
+    /// Set the threshold for determining if a trigger is pressed.
+    #[doc(alias = "setTriggerThreshold")]
+    pub fn set_trigger_threshold(&self, thresh: f32) {
+        call_method!(void self, self.gamepad, "setTriggerThreshold", "(F)V", [thresh]);
+    }
+    /// Get the threshold for determining if a trigger is pressed.
+    #[doc(alias = "getTriggerThreshold")]
+    #[must_use]
+    pub fn get_trigger_threshold(&self) -> f32 {
+        call_method!(float self, self.gamepad, "getTriggerThreshold", "()F", [])
+    }
     /// Return whether the specified button is released.
     #[must_use]
     pub fn is_released(&self, button: Button) -> bool {
@@ -433,7 +445,7 @@ impl Gamepad {
         })
         .schedule();
     }
-    /// Execute the provided function when the provided edge of the provided button occurs.
+    /// Execute the provided function when the provided edge of the provided stick occurs.
     pub fn execute_on_stick(
         &self,
         stick: Stick,
@@ -446,7 +458,7 @@ impl Gamepad {
             stick,
             f,
             threshold,
-            dir,
+            abs: dir,
         })
         .schedule();
     }

@@ -17,6 +17,11 @@ macro_rules! call_method {
             $crate::call_method!(env env, $obj, $name, $sig, $args).unwrap().d()
         }).unwrap()
     }};
+    (float $self:expr, $obj:expr, $name:expr, $sig:expr, $args:tt $(,)?) => {{
+        $self.vm.attach_current_thread(|env| {
+            $crate::call_method!(env env, $obj, $name, $sig, $args).unwrap().f()
+        }).unwrap()
+    }};
     (int $self:expr, $obj:expr, $name:expr, $sig:expr, $args:tt $(,)?) => {{
         $self.vm.attach_current_thread(|env| {
             $crate::call_method!(env env, $obj, $name, $sig, $args).unwrap().i()

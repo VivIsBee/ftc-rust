@@ -12,13 +12,14 @@ use crate::FtcContext;
 /// The scheduler singleton.
 pub(crate) static SCHEDULER: LazyLock<RwLock<CommandScheduler>> = LazyLock::new(|| {
     RwLock::new(CommandScheduler {
-        commands: RwLock::new(Vec::with_capacity(16)),
-        states: RwLock::new(Vec::with_capacity(16)),
+        commands: Vec::with_capacity(16),
+        states: Vec::with_capacity(16),
     })
 });
 
 /// Get the scheduler. Should generally not be used as most methods are otherwise available on other
-/// types.
+/// types. Cannot be used to schedule commands, use the method [`schedule`](Command::schedule)
+/// available on all [`Command`]s.
 pub fn get_scheduler<'a>() -> RwLockReadGuard<'a, CommandScheduler> {
     SCHEDULER.read().unwrap()
 }
@@ -38,9 +39,9 @@ enum CommandState {
 /// The command scheduler.
 pub struct CommandScheduler {
     /// The currently scheduled commands.
-    commands: RwLock<Vec<Arc<RwLock<dyn Command>>>>,
+    commands: Vec<Box<dyn Command>>,
     /// The current states of the commands.
-    states: RwLock<Vec<Arc<RwLock<CommandState>>>>,
+    states: Vec<CommandState>,
 }
 
 impl Debug for CommandScheduler {
@@ -53,62 +54,56 @@ impl Debug for CommandScheduler {
 
 impl CommandScheduler {
     /// Return the length of the command queue.
+    #[must_use]
     pub fn queue_len(&self) -> usize {
         debug_assert!(
-            self.commands.read().unwrap().len() == self.states.read().unwrap().len(),
+            self.commands.len() == self.states.len(),
             "the length of commands and states are out of sync!"
         );
 
-        self.commands.read().unwrap().len()
+        self.commands.len()
     }
     /// Execute this command.
     pub fn execute(&mut self, command: impl Command) {
-        self.commands
-            .write()
-            .unwrap()
-            .push(Arc::new(RwLock::new(command)));
-        self.states
-            .write()
-            .unwrap()
-            .push(Arc::new(RwLock::new(CommandState::Initializing)));
+        self.commands.push(Box::new(command));
+        self.states.push(CommandState::Initializing);
 
         debug_assert!(
-            self.commands.read().unwrap().len() == self.states.read().unwrap().len(),
+            self.commands.len() == self.states.len(),
             "the length of commands and states are out of sync!"
         );
     }
     /// Run this scheduler.
     pub(crate) fn run(&mut self, ctx: &FtcContext) {
-        while !self.commands.read().unwrap().is_empty() {
-            let to_remove = Arc::new(RwLock::new(Vec::with_capacity(
-                self.commands.read().unwrap().len(),
-            )));
-            let iter1 = self.commands.read().unwrap();
-            let iter2 = self.states.read().unwrap();
+        while !self.commands.is_empty() {
+            let to_remove = Arc::new(RwLock::new(Vec::with_capacity(self.commands.len())));
             std::thread::scope(|s| {
-                for (i, (cmd, state)) in iter1.iter().zip(iter2.iter()).enumerate() {
+                for (i, (cmd, state)) in self
+                    .commands
+                    .iter_mut()
+                    .zip(self.states.iter_mut())
+                    .enumerate()
+                {
                     let ctx = ctx.clone();
                     let to_remove = to_remove.clone();
                     s.spawn(move || {
-                        match *state.read().unwrap() {
+                        match *state {
                             CommandState::Finished => {
-                                cmd.write().unwrap().end(&ctx);
+                                cmd.end(&ctx);
                                 to_remove.write().unwrap().push(i);
                             }
                             CommandState::Initializing => {
-                                cmd.write().unwrap().init(&ctx);
-                                *state.write().unwrap() = CommandState::Executing;
+                                cmd.init(&ctx);
+                                *state = CommandState::Executing;
                             }
                             CommandState::Executing => {
-                                if cmd.write().unwrap().try_run(&ctx) {
-                                    cmd.write().unwrap().execute(&ctx);
+                                if cmd.try_run(&ctx) {
+                                    cmd.execute(&ctx);
                                 }
                             }
                         }
-                        if *state.read().unwrap() != CommandState::Finished
-                            && cmd.write().unwrap().is_finished(&ctx)
-                        {
-                            *state.write().unwrap() = CommandState::Finished;
+                        if *state != CommandState::Finished && cmd.is_finished(&ctx) {
+                            *state = CommandState::Finished;
                         }
                     });
                 }
@@ -214,25 +209,24 @@ impl<T: Command> Command for VecDeque<T> {
 
 impl<T: Command> Command for Vec<T> {
     fn init(&mut self, ctx: &FtcContext) {
-        self.reverse();
-        if let Some(cmd) = self.last_mut() {
+        if let Some(cmd) = self.first_mut() {
             cmd.init(ctx);
         }
     }
     fn execute(&mut self, ctx: &FtcContext) {
-        if let Some(cmd) = self.last_mut() {
+        if let Some(cmd) = self.first_mut() {
             cmd.execute(ctx);
             if cmd.is_finished(ctx) {
                 cmd.end(ctx);
-                self.pop();
-                if let Some(cmd) = self.last_mut() {
+                self.remove(0);
+                if let Some(cmd) = self.first_mut() {
                     cmd.init(ctx);
                 }
             }
         }
     }
     fn try_run(&mut self, ctx: &FtcContext) -> bool {
-        if let Some(cmd) = self.last_mut() {
+        if let Some(cmd) = self.first_mut() {
             cmd.try_run(ctx)
         } else {
             false

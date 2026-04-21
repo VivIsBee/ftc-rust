@@ -161,6 +161,9 @@ pub enum Button {
     TouchpadFinger2,
 
     Ps,
+
+    LeftTrigger,
+    RightTrigger,
 }
 
 #[allow(missing_docs, reason = "idgaf")]
@@ -343,21 +346,27 @@ macro_rules! gamepad_button {
         #[must_use]
         pub fn is_pressed(&self, button: Button) -> bool {
             match button {
-                $(Button:: $ty_name => self. $name ()),*
+                $(Button:: $ty_name => self. $name (), )*
+                Button::LeftTrigger => self.left_trigger_pressed(),
+                Button::RightTrigger => self.right_trigger_pressed(),
             }
         }
         /// Return whether the specified button was newly pressed since the last call.
         #[must_use]
         pub fn was_pressed(&self, button: Button) -> bool {
             match button {
-                $(Button:: $ty_name => self. [< $name _was_pressed >] ()),*
+                $(Button:: $ty_name => self. [< $name _was_pressed >] (), )*
+                Button::LeftTrigger => self.left_trigger_was_pressed(),
+                Button::RightTrigger => self.right_trigger_was_pressed(),
             }
         }
         /// Return whether the specified button was newly released since the last call.
         #[must_use]
         pub fn was_released(&self, button: Button) -> bool {
             match button {
-                $(Button:: $ty_name => self. [< $name _was_released >] ()),*
+                $(Button:: $ty_name => self. [< $name _was_released >] (), )*
+                Button::LeftTrigger => self.left_trigger_was_released(),
+                Button::RightTrigger => self.right_trigger_was_released(),
             }
         } }
     };
@@ -500,6 +509,190 @@ impl Gamepad {
         /// No idea what this is.
         pub button ps Ps
     );
+
+    /// Boolean value of if the left trigger is past `DEFAULT_TRIGGER_THRESHOLD`.
+    #[must_use]
+    pub fn left_trigger_pressed(&self) -> bool {
+        self.vm
+            .attach_current_thread(|env| {
+                env.get_field(
+                    &self.gamepad,
+                    JNIString::new("left_trigger_pressed"),
+                    jni_sig!("Z"),
+                )
+                .unwrap()
+                .z()
+            })
+            .unwrap()
+    }
+    ///Checks if `left_trigger` was pressed since the last call of this method
+    #[must_use]
+    pub fn left_trigger_was_pressed(&self) -> bool {
+        {
+            self.vm
+                .attach_current_thread(|env| {
+                    {
+                        let env: &mut crate::jni::Env = env;
+                        let obj = env.new_local_ref(&self.gamepad).unwrap();
+                        env.call_method(
+                            &obj,
+                            crate::jni::strings::JNIString::new(
+                                snake_to_camel("left_trigger") + "WasPressed",
+                            ),
+                            crate::jni::signature::RuntimeMethodSignature::from_str("()Z")
+                                .unwrap()
+                                .method_signature(),
+                            &[],
+                        )
+                    }
+                    .unwrap()
+                    .z()
+                })
+                .unwrap()
+        }
+    }
+    ///Checks if`left_trigger`was released since the last call of this method
+    #[must_use]
+    pub fn left_trigger_was_released(&self) -> bool {
+        {
+            self.vm
+                .attach_current_thread(|env| {
+                    {
+                        let env: &mut crate::jni::Env = env;
+                        let obj = env.new_local_ref(&self.gamepad).unwrap();
+                        env.call_method(
+                            &obj,
+                            crate::jni::strings::JNIString::new(
+                                snake_to_camel("left_trigger") + "WasReleased",
+                            ),
+                            crate::jni::signature::RuntimeMethodSignature::from_str("()Z")
+                                .unwrap()
+                                .method_signature(),
+                            &[],
+                        )
+                    }
+                    .unwrap()
+                    .z()
+                })
+                .unwrap()
+        }
+    }
+    /// Execute the provided function when the provided edge occurs.
+    pub fn execute_on_left_trigger_pressed(
+        &self,
+        f: impl FnMut(PressEdge) + 'static + Send + Sync,
+        edge: PressEdge,
+    ) {
+        self.execute_on(Button::LeftTrigger, f, edge);
+    }
+    ///Runs the provided function whenever `left_trigger` is pressed.
+    pub fn on_press_left_trigger(&self, f: impl FnMut(PressEdge) + 'static + Send + Sync) {
+        self.execute_on_left_trigger_pressed(f, PressEdge::Press);
+    }
+    ///Runs the provided function whenever `left_trigger` is released.
+    pub fn on_release_left_trigger(&self, f: impl FnMut(PressEdge) + 'static + Send + Sync) {
+        self.execute_on_left_trigger_pressed(f, PressEdge::Release);
+    }
+    ///Runs the provided function while `left_trigger` is pressed.
+    pub fn while_press_left_trigger(&self, f: impl FnMut(PressEdge) + 'static + Send + Sync) {
+        self.execute_on_left_trigger_pressed(f, PressEdge::WhilePressed);
+    }
+    ///Runs the provided function while `left_trigger` is released.
+    pub fn while_release_left_trigger(&self, f: impl FnMut(PressEdge) + 'static + Send + Sync) {
+        self.execute_on_left_trigger_pressed(f, PressEdge::WhileReleased);
+    }
+    /// Boolean value of if the right trigger is past `DEFAULT_TRIGGER_THRESHOLD`.
+    #[must_use]
+    pub fn right_trigger_pressed(&self) -> bool {
+        self.vm
+            .attach_current_thread(|env| {
+                env.get_field(
+                    &self.gamepad,
+                    JNIString::new("right_trigger_pressed"),
+                    jni_sig!("Z"),
+                )
+                .unwrap()
+                .z()
+            })
+            .unwrap()
+    }
+    ///Checks if `right_trigger` was pressed since the last call of this method
+    #[must_use]
+    pub fn right_trigger_was_pressed(&self) -> bool {
+        {
+            self.vm
+                .attach_current_thread(|env| {
+                    {
+                        let env: &mut crate::jni::Env = env;
+                        let obj = env.new_local_ref(&self.gamepad).unwrap();
+                        env.call_method(
+                            &obj,
+                            crate::jni::strings::JNIString::new(
+                                snake_to_camel("right_trigger") + "WasPressed",
+                            ),
+                            crate::jni::signature::RuntimeMethodSignature::from_str("()Z")
+                                .unwrap()
+                                .method_signature(),
+                            &[],
+                        )
+                    }
+                    .unwrap()
+                    .z()
+                })
+                .unwrap()
+        }
+    }
+    ///Checks if `right_trigger` was released since the last call of this method
+    #[must_use]
+    pub fn right_trigger_was_released(&self) -> bool {
+        {
+            self.vm
+                .attach_current_thread(|env| {
+                    {
+                        let env: &mut crate::jni::Env = env;
+                        let obj = env.new_local_ref(&self.gamepad).unwrap();
+                        env.call_method(
+                            &obj,
+                            crate::jni::strings::JNIString::new(
+                                snake_to_camel("right_trigger") + "WasReleased",
+                            ),
+                            crate::jni::signature::RuntimeMethodSignature::from_str("()Z")
+                                .unwrap()
+                                .method_signature(),
+                            &[],
+                        )
+                    }
+                    .unwrap()
+                    .z()
+                })
+                .unwrap()
+        }
+    }
+    /// Execute the provided function when the provided edge occurs.
+    pub fn execute_on_right_trigger_pressed(
+        &self,
+        f: impl FnMut(PressEdge) + 'static + Send + Sync,
+        edge: PressEdge,
+    ) {
+        self.execute_on(Button::RightTrigger, f, edge);
+    }
+    ///Runs the provided function whenever `right_trigger` is pressed.
+    pub fn on_press_right_trigger(&self, f: impl FnMut(PressEdge) + 'static + Send + Sync) {
+        self.execute_on_right_trigger_pressed(f, PressEdge::Press);
+    }
+    ///Runs the provided function whenever `right_trigger` is released.
+    pub fn on_release_right_trigger(&self, f: impl FnMut(PressEdge) + 'static + Send + Sync) {
+        self.execute_on_right_trigger_pressed(f, PressEdge::Release);
+    }
+    ///Runs the provided function while `right_trigger` is pressed.
+    pub fn while_press_right_trigger(&self, f: impl FnMut(PressEdge) + 'static + Send + Sync) {
+        self.execute_on_right_trigger_pressed(f, PressEdge::WhilePressed);
+    }
+    ///Runs the provided function while `right_trigger` is released.
+    pub fn while_release_right_trigger(&self, f: impl FnMut(PressEdge) + 'static + Send + Sync) {
+        self.execute_on_right_trigger_pressed(f, PressEdge::WhileReleased);
+    }
+
     gamepad_button!(
         /// The X coordinate of the left stick.
         pub float left_stick_x LeftStickX
